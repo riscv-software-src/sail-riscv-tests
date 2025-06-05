@@ -1,0 +1,33 @@
+name: Weekly Test Build and Release
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Runs every Sunday at 0 AM UTC (adjust as needed)
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository with submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+        
+    - name: Install Toolchain
+      run: |
+        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2025.05.30-nightly.tar.gz | tar -xzf -
+    
+    - name: Build Spike
+      run: |
+        git clone https://github.com/riscv-software-src/riscv-isa-sim.git
+        cd riscv-isa-sim
+        git reset --hard b0d7621ff8e9520aaacd57d97d4d99a545062d14
+        mkdir build
+        cd build
+        ../configure --prefix=${{ github.workspace }}/riscv
+        make -j$(nproc)
+        make install
+
