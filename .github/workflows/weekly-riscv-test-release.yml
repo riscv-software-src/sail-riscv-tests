@@ -80,12 +80,29 @@ jobs:
         make generate-stage1 --environment-overrides VLEN=256 XLEN=64 PATTERN='^vle8\.v$'
         make all -j$(nproc) --environment-overrides VLEN=256 XLEN=64 PATTERN='^vle8\.v$'
 
+         
     - name: Archive test binaries
       run: |
          mkdir -p release
          DATE=$(date +'%Y-%m-%d')
-         ARCHIVE_NAME="riscv-vector-tests-v256x64machine-${DATE}-linux.tar.gz"
-         tar -czf "release/$ARCHIVE_NAME" -C riscv-vector-tests/out/v256x64machine/bin/stage2 .
+         ARCHIVE_NAME="riscv-complete-tests-v256x64machine-${DATE}-linux.tar.gz"
+     
+         # Create a temporary directory to organize all tests
+         mkdir -p temp-archive/rvv-tests/v256x64
+         mkdir -p temp-archive/riscv-tests
+     
+         # Copy vector tests to rvv-tests/v256x64 folder
+         cp -r riscv-vector-tests/out/v256x64machine/bin/stage2/* temp-archive/rvv-tests/v256x64/
+     
+         # Copy ISA tests to riscv-tests folder
+         find riscv-tests/isa/ -maxdepth 1 -type f -exec cp {} temp-archive/riscv-tests/ \;
+     
+         # Create single archive with both
+         tar -czf "release/$ARCHIVE_NAME" -C temp-archive .
+     
+         # Clean up
+         rm -rf temp-archive
+     
          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
          echo "RELEASE_DATE=$DATE" >> $GITHUB_ENV
 
