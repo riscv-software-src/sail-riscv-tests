@@ -1,9 +1,8 @@
 name: Weekly Test Build and Release
-
 on:
   schedule:
-    - cron: '0 0 * * 0' # Runs every Sunday at 0 AM UTC (adjust as needed)
-  workflow_dispatch: # Allows manual triggering
+    - cron: '0 0 * * 0' # Runs every Sunday at 0 AM UTC (fixed cron syntax)
+  workflow_dispatch:
 
 jobs:
   build-and-release:
@@ -15,19 +14,89 @@ jobs:
       with:
         submodules: recursive
     
-        
+    - name: Initialize nested submodules
+      run: |
+        cd riscv-vector-tests
+        git submodule update --init --recursive
+
+    - name: Setup golang
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y device-tree-compiler
+
+    # Cache key for Spike - change this when you want to rebuild
+    - name: Get Spike Cache Key
+      id: get-spike-cache-key
+      run: |
+        echo "key=b0d7621ff8e9520aaacd57d97d4d99a545062d14" >> $GITHUB_OUTPUT
+
+    - name: Cache Spike Installation
+      id: cache-spike
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/riscv
+        key: ${{ runner.os }}-spike-${{ steps.get-spike-cache-key.outputs.key }}
+
+    # Newer versions of the nightly build dont come with the vector extension, this needs to be checked manually
     - name: Install Toolchain
       run: |
-        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2025.05.30-nightly.tar.gz | tar -xzf -
-    
+        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2024.04.12-nightly.tar.gz | tar -xzf -
+
+    - name: Set Environment Variables
+      run: |
+        echo "PATH=${{ github.workspace }}/riscv/bin:$PATH" >> $GITHUB_ENV
+        echo "RISCV=${{ github.workspace }}/riscv" >> $GITHUB_ENV
+
+    - name: Build RISC-V Test
+      run: |
+        cd riscv-tests
+        git submodule update --init --recursive
+        autoconf
+        ./configure  --prefix=${{ github.workspace }}/riscv
+        make isa
+
     - name: Build Spike
+      if: steps.cache-spike.outputs.cache-hit != 'true'
       run: |
         git clone https://github.com/riscv-software-src/riscv-isa-sim.git
         cd riscv-isa-sim
         git reset --hard b0d7621ff8e9520aaacd57d97d4d99a545062d14
         mkdir build
         cd build
+        # Configure to install to workspace directory instead of system directories
         ../configure --prefix=${{ github.workspace }}/riscv
         make -j$(nproc)
         make install
 
+    - name: Build and Test
+      run: |
+        cd riscv-vector-tests
+        git submodule update --init --recursive
+        make generate-stage1 --environment-overrides VLEN=256 XLEN=64 PATTERN='^vle8\.v$'
+        make all -j$(nproc) --environment-overrides VLEN=256 XLEN=64 PATTERN='^vle8\.v$'
+
+    - name: Archive test binaries
+      run: |
+         mkdir -p release
+         DATE=$(date +'%Y-%m-%d')
+         ARCHIVE_NAME="riscv-vector-tests-v256x64machine-${DATE}-linux.tar.gz"
+         tar -czf "release/$ARCHIVE_NAME" -C riscv-vector-tests/out/v256x64machine/bin/stage2 .
+         echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+         echo "RELEASE_DATE=$DATE" >> $GITHUB_ENV
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: weekly-${{ env.RELEASE_DATE }}
+        name:  Weekly Release ${{ env.RELEASE_DATE }} RISC-V Tests
+        files: release/${{ env.ARCHIVE_NAME }}
+        preserve_order: true
+        draft: false
+        prerelease: false
+      env:
+       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
