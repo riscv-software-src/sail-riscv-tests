@@ -1,12 +1,18 @@
 name: Weekly Test Build and Release
 on:
   schedule:
-    - cron: '0 0 * * 0' # Runs every Sunday at 0 AM UTC (fixed cron syntax)
+    - cron: '0 0 * * 0' # Runs every Sunday at 0 AM UTC
   workflow_dispatch:
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        VLEN: [128, 256, 512]
+        XLEN: [32, 64]
+    env:
+      PATTERN: '^vle8\.v$'
     
     steps:
     - name: Checkout repository with submodules
@@ -29,7 +35,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y device-tree-compiler
 
-    # Cache key for Spike - change this when you want to rebuild
     - name: Get Spike Cache Key
       id: get-spike-cache-key
       run: |
@@ -42,7 +47,8 @@ jobs:
         path: ${{ github.workspace }}/riscv
         key: ${{ runner.os }}-spike-${{ steps.get-spike-cache-key.outputs.key }}
 
-    # Newer versions of the nightly build dont come with the vector extension, this needs to be checked manually
+    # Newer versions of the nightly build dont come with
+    # the vector extension this needs to be checked manually
     - name: Install Toolchain
       run: |
         wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2024.04.12-nightly.tar.gz | tar -xzf -
@@ -77,43 +83,49 @@ jobs:
       run: |
         cd riscv-vector-tests
         git submodule update --init --recursive
-        make generate-stage1 --environment-overrides VLEN=256 XLEN=64 PATTERN='^vle8\.v$'
-        make all -j$(nproc) --environment-overrides VLEN=256 XLEN=64 PATTERN='^vle8\.v$'
-
+        make generate-stage1 --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
+        make all -j$(nproc) --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
          
     - name: Archive test binaries
       run: |
-         mkdir -p release
-         DATE=$(date +'%Y-%m-%d')
-         ARCHIVE_NAME="riscv-complete-tests-v256x64machine-${DATE}-linux.tar.gz"
-     
-         # Create a temporary directory to organize all tests
-         mkdir -p temp-archive/rvv-tests/v256x64
-         mkdir -p temp-archive/riscv-tests
-     
-         # Copy vector tests to rvv-tests/v256x64 folder
-         cp -r riscv-vector-tests/out/v256x64machine/bin/stage2/* temp-archive/rvv-tests/v256x64/
-     
-         # Copy ISA tests to riscv-tests folder
-         find riscv-tests/isa/ -maxdepth 1 -type f -exec cp {} temp-archive/riscv-tests/ \;
-     
-         # Create single archive with both
-         tar -czf "release/$ARCHIVE_NAME" -C temp-archive .
-     
-         # Clean up
-         rm -rf temp-archive
-     
-         echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
-         echo "RELEASE_DATE=$DATE" >> $GITHUB_ENV
+        mkdir -p temp-archive/riscv-vector-tests/v${{ matrix.VLEN }}x${{ matrix.XLEN }}
+        mkdir -p temp-archive/riscv-tests
+        # TODO this to be done at the end
+        cp -r riscv-vector-tests/out/v${{ matrix.VLEN }}x${{ matrix.XLEN }}machine/bin/stage2/* temp-archive/riscv-vector-tests/v${{ matrix.VLEN }}x${{ matrix.XLEN }}/
+        find riscv-tests/isa/ -maxdepth 1 -type f -exec cp {} temp-archive/riscv-tests/ \;
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
       with:
-        tag_name: weekly-${{ env.RELEASE_DATE }}
-        name:  Weekly Release ${{ env.RELEASE_DATE }} RISC-V Tests
-        files: release/${{ env.ARCHIVE_NAME }}
-        preserve_order: true
-        draft: false
-        prerelease: false
-      env:
-       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: v${{ matrix.VLEN }}x${{ matrix.XLEN }}
+        path: temp-archive/**
+  
+  combine-results:
+    runs-on: ubuntu-latest
+    needs: build-and-release
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: combined-results
+
+      - name: Archive all combinations
+        run: |
+          mkdir -p release
+          DATE=$(date +'%Y-%m-%d')
+          ARCHIVE_NAME="riscv-complete-tests-machine-${DATE}-linux.tar.gz"
+
+          tar -czf "release/$ARCHIVE_NAME" -C combined-results .
+
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "RELEASE_DATE=$DATE" >> $GITHUB_ENV
+
+      - name: Create Combined Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: weekly-${{ env.RELEASE_DATE }}
+          name: Weekly Release ${{ env.RELEASE_DATE }} RISC-V Tests
+          files: release/${{ env.ARCHIVE_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
