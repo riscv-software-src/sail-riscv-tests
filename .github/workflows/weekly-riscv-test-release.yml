@@ -40,16 +40,24 @@ jobs:
       run: |
         echo "key=b0d7621ff8e9520aaacd57d97d4d99a545062d14" >> $GITHUB_OUTPUT
 
-    - name: Cache Spike Installation
+    - name: Cache Spike
       id: cache-spike
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/riscv
         key: ${{ runner.os }}-spike-${{ steps.get-spike-cache-key.outputs.key }}
 
+    - name: Cache RISC-V Toolchain
+      id: cache-toolchain
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/riscv
+        key: ${{ runner.os }}-riscv-toolchain-2024.04.12-nightly
+
     # Newer versions of the nightly build dont come with
     # the vector extension this needs to be checked manually
-    - name: Install Toolchain
+    - name: Install RISC-V Toolchain
+      if: steps.cache-toolchain.outputs.cache-hit != 'true'
       run: |
         wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2024.04.12-nightly.tar.gz | tar -xzf -
 
