@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-release:
+  build-riscv-vector-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -66,14 +66,6 @@ jobs:
         echo "PATH=${{ github.workspace }}/riscv/bin:$PATH" >> $GITHUB_ENV
         echo "RISCV=${{ github.workspace }}/riscv" >> $GITHUB_ENV
 
-    - name: Build RISC-V Test
-      run: |
-        cd riscv-tests
-        git submodule update --init --recursive
-        autoconf
-        ./configure  --prefix=${{ github.workspace }}/riscv
-        make isa
-
     - name: Build Spike
       if: steps.cache-spike.outputs.cache-hit != 'true'
       run: |
@@ -97,10 +89,7 @@ jobs:
     - name: Archive test binaries
       run: |
         mkdir -p temp-archive/
-        mkdir -p temp-archive/riscv-tests
-        # TODO this to be done at the end
         cp -r riscv-vector-tests/out/v${{ matrix.VLEN }}x${{ matrix.XLEN }}machine/bin/stage2/* temp-archive/
-        find riscv-tests/isa/ -maxdepth 1 -type f -exec cp {} temp-archive/riscv-tests/ \;
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -108,9 +97,53 @@ jobs:
         name: v${{ matrix.VLEN }}x${{ matrix.XLEN }}
         path: temp-archive/**
   
+  build-riscv-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository with submodules
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Cache RISC-V Toolchain
+      id: cache-toolchain
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/riscv
+        key: ${{ runner.os }}-riscv-toolchain-2024.04.12-nightly
+
+    - name: Install RISC-V Toolchain
+      if: steps.cache-toolchain.outputs.cache-hit != 'true'
+      run: |
+        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2024.04.12-nightly.tar.gz | tar -xzf -
+
+    - name: Set Environment Variables
+      run: |
+        echo "PATH=${{ github.workspace }}/riscv/bin:$PATH" >> $GITHUB_ENV
+        echo "RISCV=${{ github.workspace }}/riscv" >> $GITHUB_ENV
+
+    - name: Build RISC-V Test
+      run: |
+        mkdir -p temp-archive/
+
+        cd riscv-tests
+        git submodule update --init --recursive
+        autoconf
+        ./configure  --prefix=${{ github.workspace }}/riscv
+        make isa
+
+        find isa/ -maxdepth 1 -type f \( -name "rv32*" -o -name "rv64*" \) ! -name "*.dump" -exec cp {} ../temp-archive/ \;
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: riscv-tests
+        path: temp-archive/**
+
   combine-results:
     runs-on: ubuntu-latest
-    needs: build-and-release
+    needs: [build-riscv-vector-tests, build-riscv-tests]
 
     steps:
       - name: Download all artifacts
@@ -125,7 +158,10 @@ jobs:
           ARCHIVE_NAME="riscv-complete-tests-machine-${DATE}-linux.tar.gz"
 
           mkdir -p final-structure/riscv-vector-tests
-          mv combined-results/* final-structure/riscv-vector-tests/
+          mkdir -p final-structure/riscv-tests
+
+          mv combined-results/v* final-structure/riscv-vector-tests/
+          mv combined-results/riscv-tests/* final-structure/riscv-tests/
 
           tar -czf "release/$ARCHIVE_NAME" -C final-structure .
 
