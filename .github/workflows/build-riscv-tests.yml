@@ -1,8 +1,9 @@
-name: Weekly Test Build and Release
+name: RISC-V Test Suite Release
 on:
-  schedule:
-    - cron: '0 0 * * 0' # Runs every Sunday at 0 AM UTC
   workflow_dispatch:
+
+env:
+  SPIKE_HASH: b0d7621ff8e9520aaacd57d97d4d99a545062d14
 
 jobs:
   build-riscv-vector-tests:
@@ -35,17 +36,12 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y device-tree-compiler
 
-    - name: Get Spike Cache Key
-      id: get-spike-cache-key
-      run: |
-        echo "key=b0d7621ff8e9520aaacd57d97d4d99a545062d14" >> $GITHUB_OUTPUT
-
     - name: Cache Spike
       id: cache-spike
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/riscv
-        key: ${{ runner.os }}-spike-${{ steps.get-spike-cache-key.outputs.key }}
+        key: ${{ runner.os }}-spike-${{ env.SPIKE_HASH }}
 
     - name: Cache RISC-V Toolchain
       id: cache-toolchain
@@ -54,8 +50,8 @@ jobs:
         path: ${{ github.workspace }}/riscv
         key: ${{ runner.os }}-riscv-toolchain-2024.04.12-nightly
 
-    # Newer versions of the nightly build dont come with
-    # the vector extension this needs to be checked manually
+    # Newer versions of the nightly build don't come with
+    # the vector extension, this needs to be checked manually
     - name: Install RISC-V Toolchain
       if: steps.cache-toolchain.outputs.cache-hit != 'true'
       run: |
@@ -71,25 +67,26 @@ jobs:
       run: |
         git clone https://github.com/riscv-software-src/riscv-isa-sim.git
         cd riscv-isa-sim
-        git reset --hard b0d7621ff8e9520aaacd57d97d4d99a545062d14
+        git reset --hard ${{ env.SPIKE_HASH }}
         mkdir build
         cd build
-        # Configure to install to workspace directory instead of system directories
         ../configure --prefix=${{ github.workspace }}/riscv
         make -j$(nproc)
         make install
 
-    - name: Build and Test
+    - name: Build RISC-V Vector Tests
       run: |
         cd riscv-vector-tests
         git submodule update --init --recursive
         make generate-stage1 --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
         make all -j$(nproc) --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
          
-    - name: Archive test binaries
+    - name: Prefix RVV Binaries
       run: |
         mkdir -p temp-archive/
-        cp -r riscv-vector-tests/out/v${{ matrix.VLEN }}x${{ matrix.XLEN }}machine/bin/stage2/* temp-archive/
+        for f in riscv-vector-tests/out/v${{ matrix.VLEN }}x${{ matrix.XLEN }}machine/bin/stage2/*; do
+          cp "$f" "temp-archive/rv${{ matrix.XLEN }}$(basename "$f")"
+        done
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -141,38 +138,50 @@ jobs:
         name: riscv-tests
         path: temp-archive/**
 
-  combine-results:
+  package-and-release:
     runs-on: ubuntu-latest
     needs: [build-riscv-vector-tests, build-riscv-tests]
-
     steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: combined-results
+          path: artifacts
 
-      - name: Archive all combinations
+      - name: Package test suites
         run: |
           mkdir -p release
           DATE=$(date +'%Y-%m-%d')
-          ARCHIVE_NAME="riscv-complete-tests-machine-${DATE}-linux.tar.gz"
+          RELEASE_ARCHIVE="riscv-complete-tests-machine-${DATE}-linux.tar.gz"
 
-          mkdir -p final-structure/riscv-vector-tests
-          mkdir -p final-structure/riscv-tests
+          RISCV_TESTS_HASH=$(git -C riscv-tests rev-parse HEAD)
+          RISCV_VECTOR_TESTS_HASH=$(git -C riscv-vector-tests rev-parse HEAD)
 
-          mv combined-results/v* final-structure/riscv-vector-tests/
-          mv combined-results/riscv-tests/* final-structure/riscv-tests/
+          mkdir -p package/riscv-vector-tests
+          mkdir -p package/riscv-tests
 
-          tar -czf "release/$ARCHIVE_NAME" -C final-structure .
+          mv artifacts/v* package/riscv-vector-tests/
+          mv artifacts/riscv-tests/* package/riscv-tests/
 
-          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+          tar -czf "release/$RELEASE_ARCHIVE" -C package .
+
+          echo "RELEASE_ARCHIVE=$RELEASE_ARCHIVE" >> $GITHUB_ENV
           echo "RELEASE_DATE=$DATE" >> $GITHUB_ENV
 
-      - name: Create Combined Release
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: weekly-${{ env.RELEASE_DATE }}
-          name: Weekly Release ${{ env.RELEASE_DATE }} RISC-V Tests
-          files: release/${{ env.ARCHIVE_NAME }}
+          tag_name: ${{ env.RELEASE_DATE }}
+          name: Release ${{ env.RELEASE_DATE }} RISC-V Tests
+          body: |
+            Built with:
+            riscv-tests: ${{ env.RISCV_TESTS_HASH }}
+            riscv-vector-tests: ${{ env.RISCV_VECTOR_TESTS_HASH }}
+            spike: ${{ env.SPIKE_HASH}}
+          files: release/${{ env.RELEASE_ARCHIVE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
