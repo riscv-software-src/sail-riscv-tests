@@ -175,6 +175,9 @@ jobs:
 
           tar -czf "release/$RELEASE_ARCHIVE" -C package .
 
+          split -b 1000M "release/$RELEASE_ARCHIVE" "release/${RELEASE_ARCHIVE}.part"
+          rm "release/$RELEASE_ARCHIVE"
+
           echo "RELEASE_ARCHIVE=$RELEASE_ARCHIVE" >> $GITHUB_ENV
           echo "RELEASE_DATE=$DATE" >> $GITHUB_ENV
 
@@ -188,6 +191,11 @@ jobs:
             riscv-tests: ${{ env.RISCV_TESTS_HASH }}
             riscv-vector-tests: ${{ env.RISCV_VECTOR_TESTS_HASH }}
             spike: ${{ env.SPIKE_HASH}}
-          files: release/${{ env.RELEASE_ARCHIVE }}
+
+            **Note:** Archive is split into parts. To reconstruct:
+            ```bash
+            cat *.parta* > riscv-tests.tar.gz
+            ```
+          files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
