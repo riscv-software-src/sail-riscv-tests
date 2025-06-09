@@ -23,7 +23,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
-    
+
     - name: Initialize nested submodules
       run: |
         cd riscv-vector-tests
@@ -83,7 +83,7 @@ jobs:
         git submodule update --init --recursive
         make generate-stage1 --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
         make all -j$(nproc) --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
-         
+
     - name: Prefix RVV Binaries
       run: |
         mkdir -p temp-archive/
@@ -91,12 +91,19 @@ jobs:
           cp "$f" "temp-archive/rv${{ matrix.XLEN }}$(basename "$f")"
         done
 
+        ARCHIVE_NAME="riscv-vector-tests-v${{ matrix.VLEN }}x${{ matrix.XLEN }}.tar.gz"
+
+        tar -czf $ARCHIVE_NAME -C temp-archive .
+        mv $ARCHIVE_NAME temp-archive/
+
+        find temp-archive/ ! -name "$ARCHIVE_NAME" -type f -delete
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: v${{ matrix.VLEN }}x${{ matrix.XLEN }}
-        path: temp-archive/**
-  
+        path: temp-archive/*.tar.gz
+
   build-riscv-tests:
     runs-on: ubuntu-latest
 
@@ -135,11 +142,20 @@ jobs:
 
         find isa/ -maxdepth 1 -type f \( -name "rv32*" -o -name "rv64*" \) ! -name "*.dump" -exec cp {} ../temp-archive/ \;
 
+        cd ..
+
+        ARCHIVE_NAME="riscv-tests.tar.gz"
+
+        tar -czf $ARCHIVE_NAME -C temp-archive .
+        mv $ARCHIVE_NAME temp-archive/
+
+        find temp-archive/ ! -name "$ARCHIVE_NAME" -type f -delete
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: riscv-tests
-        path: temp-archive/**
+        path: temp-archive/*.tar.gz
 
   package-and-release:
     runs-on: ubuntu-latest
@@ -164,38 +180,27 @@ jobs:
           RISCV_TESTS_HASH=$(git -C riscv-tests rev-parse HEAD)
           RISCV_VECTOR_TESTS_HASH=$(git -C riscv-vector-tests rev-parse HEAD)
 
+          echo "REPO_NAME=$GITHUB_REPOSITORY" >> $GITHUB_ENV
+          echo "REPO_HASH=$GITHUB_SHA" >> $GITHUB_ENV
           echo "RISCV_TESTS_HASH=$RISCV_TESTS_HASH" >> $GITHUB_ENV
           echo "RISCV_VECTOR_TESTS_HASH=$RISCV_VECTOR_TESTS_HASH" >> $GITHUB_ENV
-
-          mkdir -p package/riscv-vector-tests
-          mkdir -p package/riscv-tests
-
-          mv artifacts/v* package/riscv-vector-tests/
-          mv artifacts/riscv-tests/* package/riscv-tests/
-
-          tar -czf "release/$RELEASE_ARCHIVE" -C package .
-
-          split -b 1000M "release/$RELEASE_ARCHIVE" "release/${RELEASE_ARCHIVE}.part"
-          rm "release/$RELEASE_ARCHIVE"
-
-          echo "RELEASE_ARCHIVE=$RELEASE_ARCHIVE" >> $GITHUB_ENV
           echo "RELEASE_DATE=$DATE" >> $GITHUB_ENV
 
+          find artifacts/ -name "*.tar.gz" -exec cp {} release/ \;
+
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+      # This is a temp. value since it suddently stopped working
+      # https://github.com/softprops/action-gh-release/issues/628
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
         with:
           tag_name: ${{ env.RELEASE_DATE }}
           name: Release ${{ env.RELEASE_DATE }} RISC-V Tests
           body: |
             Built with:
+            ${{ env.REPO_NAME }}: ${{ env.REPO_HASH}}
             riscv-tests: ${{ env.RISCV_TESTS_HASH }}
             riscv-vector-tests: ${{ env.RISCV_VECTOR_TESTS_HASH }}
             spike: ${{ env.SPIKE_HASH}}
-
-            **Note:** Archive is split into parts. To reconstruct:
-            ```bash
-            cat *.parta* > riscv-tests.tar.gz
-            ```
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
