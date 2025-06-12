@@ -1,2 +1,3 @@
-# riscv-test-generator
- RISC-V test generator supporting multiple test suites.
+# riscv-sail-tests
+
+ Precompiled test suites for comprehensive testing of the RISC-V Sail model.
