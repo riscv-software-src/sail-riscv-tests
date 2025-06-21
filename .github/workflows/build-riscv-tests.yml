@@ -189,13 +189,13 @@ jobs:
           find artifacts/ -name "*.tar.gz" -exec cp {} release/ \;
 
       - name: Publish release
-      # This is a temp. value since it suddently stopped working
-      # https://github.com/softprops/action-gh-release/issues/628
-        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_DATE }}
-          name: Release ${{ env.RELEASE_DATE }} RISC-V Tests
+          name: RISC-V Tests - ${{ env.RELEASE_DATE }}
           body: |
+            Precompiled binaries for testing of the RISC-V Sail model.
+
             Built with:
             ${{ env.REPO_NAME }}: ${{ env.REPO_HASH}}
             riscv-tests: ${{ env.RISCV_TESTS_HASH }}
