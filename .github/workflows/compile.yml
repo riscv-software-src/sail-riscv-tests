@@ -1,0 +1,107 @@
+name: CI
+on:
+  pull_request:
+
+env:
+  SPIKE_HASH: b0d7621ff8e9520aaacd57d97d4d99a545062d14
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        VLEN: [128, 256, 512]
+        XLEN: [32, 64]
+    env:
+      PATTERN: '.*'
+
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Setup golang
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y device-tree-compiler
+
+    - name: Initialize submodules
+      run: |
+        cd riscv-vector-tests
+        git submodule update --init --recursive
+
+    - name: Cache Spike
+      id: cache-spike
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/riscv
+        key: ${{ runner.os }}-spike-${{ env.SPIKE_HASH }}
+
+    - name: Cache RISC-V Toolchain
+      id: cache-toolchain
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/riscv
+        key: ${{ runner.os }}-riscv-toolchain-2024.04.12-nightly
+
+    - name: Install RISC-V Toolchain
+      if: steps.cache-toolchain.outputs.cache-hit != 'true'
+      run: |
+        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2024.04.12-nightly.tar.gz | tar -xzf -
+
+    - name: Set Environment Variables
+      run: |
+        echo "PATH=${{ github.workspace }}/riscv/bin:$PATH" >> $GITHUB_ENV
+        echo "RISCV=${{ github.workspace }}/riscv" >> $GITHUB_ENV
+
+    - name: Build Spike
+      if: steps.cache-spike.outputs.cache-hit != 'true'
+      run: |
+        git clone https://github.com/riscv-software-src/riscv-isa-sim.git
+        cd riscv-isa-sim
+        git reset --hard ${{ env.SPIKE_HASH }}
+        mkdir build
+        cd build
+        ../configure --prefix=${{ github.workspace }}/riscv
+        make -j$(nproc)
+        make install
+
+    - name: Compile RISC-V Vector Tests
+      run: |
+        cd riscv-vector-tests
+        git submodule update --init --recursive
+        make generate-stage1 --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
+        make all -j$(nproc) --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
+
+    - name: Compile RISC-V Tests
+      run: |
+        cd riscv-tests
+        git submodule update --init --recursive
+        autoconf
+        ./configure --prefix=${{ github.workspace }}/riscv
+        make isa -j$(nproc)
+
+    - name: Report Success
+      run: |
+        echo "PR builds successfully!"
+        echo "Actor: ${{ github.actor }}"
+
+ auto-merge:
+    runs-on: ubuntu-latest
+    needs: test-build
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Enable auto-merge for Dependabot PRs
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: squash
