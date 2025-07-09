@@ -1,6 +1,9 @@
 name: RISC-V Test Suite Release
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 env:
   SPIKE_HASH: b0d7621ff8e9520aaacd57d97d4d99a545062d14
@@ -24,11 +27,6 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Initialize nested submodules
-      run: |
-        cd riscv-vector-tests
-        git submodule update --init --recursive
-
     - name: Setup golang
       uses: actions/setup-go@v5
       with:
@@ -38,6 +36,11 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y device-tree-compiler
+
+    - name: Initialize nested submodules
+      run: |
+        cd riscv-vector-tests
+        git submodule update --init --recursive
 
     - name: Cache Spike
       id: cache-spike
@@ -194,7 +197,7 @@ jobs:
           tag_name: ${{ env.RELEASE_DATE }}
           name: RISC-V Tests - ${{ env.RELEASE_DATE }}
           body: |
-            Precompiled binaries for testing of the RISC-V Sail model.
+            Precompiled binaries for testing of the Sail RISC-V model.
 
             Built with:
             ${{ env.REPO_NAME }}: ${{ env.REPO_HASH}}
