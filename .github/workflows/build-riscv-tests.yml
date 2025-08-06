@@ -20,7 +20,8 @@ jobs:
       # Provide regex to filter for which instruction tests should be generated.
       # Use '.*' for all, or '^vle8\.v$' for specific instructions etc.
       PATTERN: '.*'
-    
+      MARCH: 'gcv_zvbb_zvbc_zfh_zvfh_zvkg_zvkned_zvknha_zvksed_zvksh'
+
     steps:
     - name: Checkout repository with submodules
       uses: actions/checkout@v4
@@ -84,8 +85,10 @@ jobs:
       run: |
         cd riscv-vector-tests
         git submodule update --init --recursive
-        make generate-stage1 --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
-        make all -j$(nproc) --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
+        make generate-stage1 --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}' \
+          MARCH=rv${{ matrix.XLEN }}${{ env.MARCH }}
+        make all -j$(nproc) --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}' \
+          MARCH=rv${{ matrix.XLEN }}${{ env.MARCH }}
 
     - name: Prefix RVV Binaries
       run: |
