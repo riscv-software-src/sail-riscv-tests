@@ -13,6 +13,7 @@ jobs:
         XLEN: [32, 64]
     env:
       PATTERN: '.*'
+      MARCH: 'gcv_zvbb_zvbc_zfh_zvfh_zvkg_zvkned_zvknha_zvksed_zvksh'
 
     steps:
     - name: Checkout PR
@@ -53,7 +54,7 @@ jobs:
     - name: Install RISC-V Toolchain
       if: steps.cache-toolchain.outputs.cache-hit != 'true'
       run: |
-        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2024.04.12-nightly.tar.gz | tar -xzf -
+        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2025.07.16/riscv64-elf-ubuntu-22.04-gcc-nightly-2025.07.16-nightly.tar.xz | tar -xJf -
 
     - name: Set Environment Variables
       run: |
@@ -76,8 +77,10 @@ jobs:
       run: |
         cd riscv-vector-tests
         git submodule update --init --recursive
-        make generate-stage1 --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
-        make all -j$(nproc) --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}'
+        make generate-stage1 --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}' \
+          MARCH=rv${{ matrix.XLEN }}${{ env.MARCH }}
+        make all -j$(nproc) --environment-overrides VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }} PATTERN='${{ env.PATTERN }}' \
+          MARCH=rv${{ matrix.XLEN }}${{ env.MARCH }}
 
     - name: Compile RISC-V Tests
       run: |

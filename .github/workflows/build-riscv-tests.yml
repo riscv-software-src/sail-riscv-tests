@@ -1,9 +1,6 @@
 name: RISC-V Test Suite Release
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 env:
   SPIKE_HASH: b0d7621ff8e9520aaacd57d97d4d99a545062d14
@@ -62,7 +59,7 @@ jobs:
     - name: Install RISC-V Toolchain
       if: steps.cache-toolchain.outputs.cache-hit != 'true'
       run: |
-        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2024.04.12-nightly.tar.gz | tar -xzf -
+        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2025.07.16/riscv64-elf-ubuntu-22.04-gcc-nightly-2025.07.16-nightly.tar.xz | tar -xJf -
 
     - name: Set Environment Variables
       run: |
