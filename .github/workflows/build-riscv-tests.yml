@@ -17,7 +17,7 @@ jobs:
       # Provide regex to filter for which instruction tests should be generated.
       # Use '.*' for all, or '^vle8\.v$' for specific instructions etc.
       PATTERN: '.*'
-      MARCH: 'gcv_zvbb_zvbc_zfh_zvfh_zvkg_zvkned_zvknha_zvksed_zvksh'
+      MARCH: 'gcv_zvbb_zvbc_zfh_zvfh_zvkg_zvkned_zvknha_zvksed_zvksh_zfbfmin_zvfbfmin_zvfbfwma'
 
     steps:
     - name: Checkout repository with submodules
