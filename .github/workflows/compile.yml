@@ -2,7 +2,7 @@ name: CI
 on: [push, pull_request, workflow_dispatch]
 
 env:
-  SPIKE_HASH: b0d7621ff8e9520aaacd57d97d4d99a545062d14
+  SPIKE_HASH: f51df5d3955a27602a872eaf01492177513baf6f
 
 jobs:
   test-build:
