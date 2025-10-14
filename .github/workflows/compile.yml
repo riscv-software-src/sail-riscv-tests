@@ -49,7 +49,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/riscv
-        key: ${{ runner.os }}-riscv-toolchain-2024.04.12-nightly
+        key: ${{ runner.os }}-riscv-toolchain-2025.07.16-nightly
 
     - name: Install RISC-V Toolchain
       if: steps.cache-toolchain.outputs.cache-hit != 'true'
