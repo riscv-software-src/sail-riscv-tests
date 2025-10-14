@@ -52,7 +52,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/riscv
-        key: ${{ runner.os }}-riscv-toolchain-2024.04.12-nightly
+        key: ${{ runner.os }}-riscv-toolchain-2025.07.16-nightly
 
     # Newer versions of the nightly build don't come with
     # the vector extension, this needs to be checked manually
@@ -121,12 +121,12 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/riscv
-        key: ${{ runner.os }}-riscv-toolchain-2024.04.12-nightly
+        key: ${{ runner.os }}-riscv-toolchain-2025.07.16-nightly
 
     - name: Install RISC-V Toolchain
       if: steps.cache-toolchain.outputs.cache-hit != 'true'
       run: |
-        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2024.04.12/riscv64-elf-ubuntu-22.04-gcc-nightly-2024.04.12-nightly.tar.gz | tar -xzf -
+        wget -O- -q https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2025.07.16/riscv64-elf-ubuntu-22.04-gcc-nightly-2025.07.16-nightly.tar.xz | tar -xJf -
 
     - name: Set Environment Variables
       run: |
