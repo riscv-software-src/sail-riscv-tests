@@ -1,0 +1,185 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  # Make this workflow reusable
+  workflow_call:
+    outputs:
+      riscv_tests_hash:
+        description: "riscv-tests commit hash"
+        value: ${{ jobs.build-riscv-tests.outputs.riscv_tests_hash }}
+      riscv_vector_tests_hash:
+        description: "riscv-vector-tests commit hash"
+        value: ${{ jobs.build-riscv-tests.outputs.riscv_vector_tests_hash }}
+      toolchain_release:
+        description: "RISC-V Toolchain Release"
+        value: ${{ jobs.build-riscv-tests.outputs.toolchain_release }}
+      spike_hash:
+        description: "Spike commit hash"
+        value: ${{ jobs.build-riscv-tests.outputs.spike_hash }}
+
+jobs:
+  build-riscv-tests:
+    name: "Build riscv-tests"
+    runs-on: ubuntu-latest
+    outputs:
+      riscv_tests_hash: ${{ steps.log-versions.outputs.riscv_tests_hash }}
+      riscv_vector_tests_hash: ${{ steps.log-versions.outputs.riscv_vector_tests_hash }}
+      spike_hash: ${{ steps.log-versions.outputs.spike_hash }}
+      toolchain_release: ${{ steps.log-versions.outputs.toolchain_release }}
+
+    steps:
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Checkout repo with submodules
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup version environment
+        run: |
+          SPIKE_HASH=$(just show-spike-hash)
+          echo "SPIKE_HASH=$SPIKE_HASH" >> $GITHUB_ENV
+          TOOLCHAIN_RELEASE=$(just show-toolchain-release)
+          echo "TOOLCHAIN_RELEASE=$TOOLCHAIN_RELEASE" >> $GITHUB_ENV
+
+      - name: Restore cached toolchain
+        id: restore-cached-toolchain
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ github.workspace }}/riscv
+          key: ${{ runner.os }}-toolchain-${{ env.TOOLCHAIN_RELEASE }}
+
+      - name: Install toolchain
+        if: steps.restore-cached-toolchain.outputs.cache-hit != 'true'
+        run: |
+          just install-toolchain ${{ github.workspace }}
+
+      - name: Cache toolchain
+        id: cache-toolchain
+        # Update cache only on the main branch
+        if: steps.restore-cached-toolchain.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ github.workspace }}/riscv
+          key: ${{ steps.restore-cached-toolchain.outputs.cache-primary-key }}
+
+      - name: Setup environment
+        run: |
+          echo "PATH=${{ github.workspace }}/riscv/bin:$PATH" >> $GITHUB_ENV
+          echo "RISCV=${{ github.workspace }}/riscv" >> $GITHUB_ENV
+
+      - name: Build riscv-tests
+        run: |
+          just riscv-tests-tgz ${{ github.workspace }}
+
+      - name: Log versions
+        id: log-versions
+        run: |
+          RISCV_TESTS_HASH=$(git -C riscv-tests rev-parse HEAD)
+          echo "riscv_tests_hash=$RISCV_TESTS_HASH" >> "$GITHUB_OUTPUT"
+          RISCV_VECTOR_TESTS_HASH=$(git -C riscv-vector-tests rev-parse HEAD)
+          echo "riscv_vector_tests_hash=$RISCV_VECTOR_TESTS_HASH" >> "$GITHUB_OUTPUT"
+          echo "spike_hash=${{ env.SPIKE_HASH }}" >>  "$GITHUB_OUTPUT"
+          echo "toolchain_release=${{ env.TOOLCHAIN_RELEASE }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload riscv-tests tar.gz
+        uses: actions/upload-artifact@v6
+        with:
+          name: riscv-tests.tar.gz
+          path: riscv-tests.tar.gz
+          if-no-files-found: error
+
+      - name: Finish riscv-tests
+        run: |
+          echo "riscv-tests tar.gz built successfully!"
+
+  build-vector-tests:
+    name: "Build riscv-vector-tests"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        VLEN: [128, 256, 512]
+        # For now, ELEN can't be freely choosen and needs to match XLEN
+        XLEN: [32, 64]
+
+    steps:
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y device-tree-compiler
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Checkout repo with submodules
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup version environment
+        run: |
+          SPIKE_HASH=$(just show-spike-hash)
+          echo "SPIKE_HASH=$SPIKE_HASH" >> $GITHUB_ENV
+          TOOLCHAIN_RELEASE=$(just show-toolchain-release)
+          echo "TOOLCHAIN_RELEASE=$TOOLCHAIN_RELEASE" >> $GITHUB_ENV
+
+      - name: Restore cached vector test build tools
+        id: restore-cached-vector-buildtools
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ github.workspace }}/riscv
+          key: ${{ runner.os }}-vector-toolchain-${{ env.TOOLCHAIN_RELEASE }}-spike-${{ env.SPIKE_HASH }}
+
+      - name: Install toolchain
+        if: steps.restore-cached-vector-buildtools.outputs.cache-hit != 'true'
+        run: |
+          just install-toolchain ${{ github.workspace }}
+
+      - name: Setup environment
+        run: |
+          echo "PATH=${{ github.workspace }}/riscv/bin:$PATH" >> $GITHUB_ENV
+          echo "RISCV=${{ github.workspace }}/riscv" >> $GITHUB_ENV
+
+      - name: Install Spike
+        if: steps.restore-cached-vector-buildtools.outputs.cache-hit != 'true'
+        run: |
+          just build-spike ${{ github.workspace }}
+          just clean-spike
+
+      - name: Cache vector test build tools
+        id: cache-vector-buildtools
+        # Update cache only on the main branch
+        if: steps.restore-cached-vector-buildtools.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ github.workspace }}/riscv
+          key: ${{ steps.restore-cached-vector-buildtools.outputs.cache-primary-key }}
+
+      - name: Build riscv-vector-tests
+        run: |
+          just vector-tests-tgz ${{ matrix.VLEN }} ${{ matrix.XLEN }} ${{ github.workspace }}
+
+      - name: Upload riscv-vector-tests tar.gz
+        uses: actions/upload-artifact@v6
+        with:
+          name: "riscv-vector-tests-v${{ matrix.VLEN }}x${{ matrix.XLEN }}.tar.gz"
+          path: "riscv-vector-tests-v${{ matrix.VLEN }}x${{ matrix.XLEN }}.tar.gz"
+          if-no-files-found: error
+
+      - name: "Finish riscv-vector VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }}"
+        run: |
+          echo "riscv-vector-tests tar.gz built successfully!"
