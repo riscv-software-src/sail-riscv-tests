@@ -8,17 +8,18 @@ SPIKE_COMMIT_HASH := "f51df5d3955a27602a872eaf01492177513baf6f"
 TOOLCHAIN_URL := "https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/" + TOOLCHAIN_RELEASE_DATE + "/riscv64-elf-ubuntu-22.04-gcc.tar.xz"
 RISCV_TESTS_ARCHIVE := "riscv-tests.tar.gz"
 VECTOR_TESTS_ARCHIVE_PREFIX := "riscv-vector-tests-"
+RELEASE_DOWNLOAD_URL := "https://github.com/riscv-software-src/sail-riscv-tests/releases/download"
 
 default:
-	@just --unstable --list
+    @just --unstable --list
 
 ### Version recipes
 
 show-spike-hash:
-	@echo {{SPIKE_COMMIT_HASH}}
+    @echo {{SPIKE_COMMIT_HASH}}
 
 show-toolchain-release:
-	@echo {{TOOLCHAIN_RELEASE_DATE}}
+    @echo {{TOOLCHAIN_RELEASE_DATE}}
 
 ### Toolchain recipe
 
@@ -49,13 +50,13 @@ build-riscv-tests prefix=INSTALL_PREFIX: (prepare-riscv-tests prefix)
 
 [working-directory: 'riscv-tests']
 tar-riscv-tests prefix=INSTALL_PREFIX: (build-riscv-tests prefix)
-    tar -cvzf ../{{RISCV_TESTS_ARCHIVE}} --exclude='*.dump' -C {{prefix}}/riscv-tests/share/riscv-tests/isa .
+    tar -cvzf ../{{RISCV_TESTS_ARCHIVE}} --exclude='*.dump' --exclude ".gitignore" --exclude "Makefile" -C {{prefix}}/riscv-tests/share/riscv-tests/isa .
 
 riscv-tests-tgz prefix=INSTALL_PREFIX: (prepare-riscv-tests prefix) (build-riscv-tests prefix) (tar-riscv-tests prefix)
 
 [working-directory: 'riscv-tests']
 clean-riscv-tests:
-	make clean
+    make clean
 
 ### Spike recipes
 
@@ -99,9 +100,31 @@ vector-tests-tgz VLEN XLEN prefix=INSTALL_PREFIX: (build-vector-tests VLEN XLEN 
 clean-vector-tests:
     make clean
 
+### Release management
+
+[script("/usr/bin/bash")]
+download-release release:
+    set -eux
+    mkdir -p releases/{{release}}
+    if [ ! -f releases/{{release}}/{{RISCV_TESTS_ARCHIVE}} ]; then
+      wget -O releases/{{release}}/{{RISCV_TESTS_ARCHIVE}} {{RELEASE_DOWNLOAD_URL}}/{{release}}/{{RISCV_TESTS_ARCHIVE}}
+    fi
+    for vlen in 128 256 512; do
+      for xlen in 32 64; do
+        if [ ! -f releases/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz ]; then
+          wget -O releases/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz {{RELEASE_DOWNLOAD_URL}}/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz
+        fi
+      done
+    done
+
+# This provides only a summary. For detailed differences, run `compare-releases.py` directly with `-v`.
+[doc]
+compare-releases previous current: (download-release previous) (download-release current)
+    ./compare-releases.py -p releases/{{previous}} -c releases/{{current}}
+
 ### Miscellaneous
 
 show-default-install-prefix:
-	@echo {{INSTALL_PREFIX}}
+    @echo {{INSTALL_PREFIX}}
 
 clean: clean-riscv-tests clean-vector-tests clean-spike
