@@ -4,7 +4,9 @@ import os, sys, argparse, tarfile, pathlib
 def files_in_tgz(f):
     with tarfile.open(f) as tgz:
         for n in tgz.getnames():
-            yield os.path.normpath(n)
+            f = os.path.normpath(n)
+            if f == "." or f == "..": continue
+            yield f
 
 def test_set_in_tgz(f):
     return set(files_in_tgz(f))
