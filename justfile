@@ -1,13 +1,20 @@
 INSTALL_PREFIX := `realpath ../sail-riscv-tests-install`
 
+ARCH := shell('arch')
+OS := shell('uname')
+
 # NOTE: Not every release of this toolchain comes with the vector extension enabled.
 # This must be manually verified for each release.
 TOOLCHAIN_RELEASE_DATE := "2026.03.13"
 SPIKE_COMMIT_HASH := "f51df5d3955a27602a872eaf01492177513baf6f"
+SAIL_RISCV_RELEASE := "0.10"
 
 TOOLCHAIN_URL := "https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/" + TOOLCHAIN_RELEASE_DATE + "/riscv64-elf-ubuntu-22.04-gcc.tar.xz"
+SAIL_RISCV_DOWNLOAD_URL := "https://github.com/riscv/sail-riscv/releases/download/" + SAIL_RISCV_RELEASE + "/sail-riscv-" + OS + "-" + ARCH + ".tar.gz"
+
 RISCV_TESTS_ARCHIVE := "riscv-tests.tar.gz"
 VECTOR_TESTS_ARCHIVE_PREFIX := "riscv-vector-tests-"
+ARCH_TESTS_ARCHIVE := "riscv-arch-tests.tar.gz"
 RELEASE_DOWNLOAD_URL := "https://github.com/riscv-software-src/sail-riscv-tests/releases/download"
 
 default:
@@ -20,6 +27,9 @@ show-spike-hash:
 
 show-toolchain-release:
     @echo {{TOOLCHAIN_RELEASE_DATE}}
+
+show-sail-riscv-release:
+    @echo {{SAIL_RISCV_RELEASE}}
 
 ### Toolchain recipe
 
@@ -49,10 +59,8 @@ build-riscv-tests prefix=INSTALL_PREFIX: (prepare-riscv-tests prefix)
     make install
 
 [working-directory: 'riscv-tests']
-tar-riscv-tests prefix=INSTALL_PREFIX: (build-riscv-tests prefix)
+riscv-tests-tgz prefix=INSTALL_PREFIX: (build-riscv-tests prefix)
     tar -cvzf ../{{RISCV_TESTS_ARCHIVE}} --exclude='*.dump' --exclude ".gitignore" --exclude "Makefile" -C {{prefix}}/riscv-tests/share/riscv-tests/isa .
-
-riscv-tests-tgz prefix=INSTALL_PREFIX: (prepare-riscv-tests prefix) (build-riscv-tests prefix) (tar-riscv-tests prefix)
 
 [working-directory: 'riscv-tests']
 clean-riscv-tests:
@@ -100,6 +108,32 @@ vector-tests-tgz VLEN XLEN prefix=INSTALL_PREFIX: (build-vector-tests VLEN XLEN 
 clean-vector-tests:
     make clean
 
+### ACT4 riscv-arch-tests recipes
+
+# ACT4 has other dependencies (`uv`, `podman`, etc.) ; this script does not handle those.
+
+install-sail-riscv prefix=INSTALL_PREFIX:
+    mkdir -p {{prefix}}/sail-riscv
+    wget -O- -q {{SAIL_RISCV_DOWNLOAD_URL}} | tar -C {{prefix}}/sail-riscv -xzf - --strip-components=1
+
+prepare-arch-tests prefix=INSTALL_PREFIX:
+    git submodule update --init --recursive
+
+# The below recipes for ACT4 require the Sail RISC-V simulator in the path.  See above
+# comment about setting environment variables.
+
+[working-directory: 'riscv-arch-test']
+build-arch-tests prefix=INSTALL_PREFIX: (prepare-arch-tests prefix)
+    CONFIG_FILES="config/sail/sail-rv64-max/test_config.yaml config/sail/sail-rv32-max/test_config.yaml" FAST=True make --jobs $(nproc)
+
+[working-directory: 'riscv-arch-test']
+arch-tests-tgz prefix=INSTALL_PREFIX: (build-arch-tests prefix)
+    tar -cvzf ../{{ARCH_TESTS_ARCHIVE}} --exclude='*.objdump' --dereference -C work sail-rv32-max/elfs sail-rv64-max/elfs
+
+[working-directory: 'riscv-arch-test']
+clean-arch-tests:
+    make clean
+
 ### Release management
 
 [script("/usr/bin/bash")]
@@ -127,4 +161,4 @@ compare-releases previous current: (download-release previous) (download-release
 show-default-install-prefix:
     @echo {{INSTALL_PREFIX}}
 
-clean: clean-riscv-tests clean-vector-tests clean-spike
+clean: clean-riscv-tests clean-vector-tests clean-spike clean-arch-tests

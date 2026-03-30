@@ -12,12 +12,18 @@ on:
       riscv_vector_tests_hash:
         description: "riscv-vector-tests commit hash"
         value: ${{ jobs.build-riscv-tests.outputs.riscv_vector_tests_hash }}
+      riscv_arch_tests_hash:
+        description: "riscv-arch-tests commit hash"
+        value: ${{ jobs.build-riscv-tests.outputs.riscv_arch_tests_hash }}
       toolchain_release:
         description: "RISC-V Toolchain Release"
         value: ${{ jobs.build-riscv-tests.outputs.toolchain_release }}
       spike_hash:
         description: "Spike commit hash"
         value: ${{ jobs.build-riscv-tests.outputs.spike_hash }}
+      sail_riscv_release:
+        description: "Sail RISC-V release"
+        value: ${{ jobs.build-riscv-tests.outputs.sail_riscv_release }}
 
 jobs:
   build-riscv-tests:
@@ -26,8 +32,10 @@ jobs:
     outputs:
       riscv_tests_hash: ${{ steps.log-versions.outputs.riscv_tests_hash }}
       riscv_vector_tests_hash: ${{ steps.log-versions.outputs.riscv_vector_tests_hash }}
+      riscv_arch_tests_hash: ${{ steps.log-versions.outputs.riscv_arch_tests_hash }}
       spike_hash: ${{ steps.log-versions.outputs.spike_hash }}
       toolchain_release: ${{ steps.log-versions.outputs.toolchain_release }}
+      sail_riscv_release: ${{ steps.log-versions.outputs.sail_riscv_release }}
 
     steps:
       - name: Install just
@@ -82,8 +90,12 @@ jobs:
           echo "riscv_tests_hash=$RISCV_TESTS_HASH" >> "$GITHUB_OUTPUT"
           RISCV_VECTOR_TESTS_HASH=$(git -C riscv-vector-tests rev-parse HEAD)
           echo "riscv_vector_tests_hash=$RISCV_VECTOR_TESTS_HASH" >> "$GITHUB_OUTPUT"
+          RISCV_ARCH_TESTS_HASH=$(git -C riscv-arch-test rev-parse HEAD)
+          echo "riscv_arch_tests_hash=$RISCV_ARCH_TESTS_HASH" >> "$GITHUB_OUTPUT"
           echo "spike_hash=${{ env.SPIKE_HASH }}" >>  "$GITHUB_OUTPUT"
           echo "toolchain_release=${{ env.TOOLCHAIN_RELEASE }}" >> "$GITHUB_OUTPUT"
+          SAIL_RISCV_RELEASE=$(just show-sail-riscv-release)
+          echo "sail_riscv_release=$SAIL_RISCV_RELEASE" >> $GITHUB_OUTPUT
 
       - name: Upload riscv-tests tar.gz
         uses: actions/upload-artifact@v6
@@ -183,3 +195,75 @@ jobs:
       - name: "Finish riscv-vector VLEN=${{ matrix.VLEN }} XLEN=${{ matrix.XLEN }}"
         run: |
           echo "riscv-vector-tests tar.gz built successfully!"
+
+  build-arch-tests:
+    name: "Build arch-tests"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Checkout repo with submodules
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup version environment
+        run: |
+          TOOLCHAIN_RELEASE=$(just show-toolchain-release)
+          echo "TOOLCHAIN_RELEASE=$TOOLCHAIN_RELEASE" >> $GITHUB_ENV
+          SAIL_RISCV_RELEASE=$(just show-sail-riscv-release)
+          echo "SAIL_RISCV_RELEASE=$SAIL_RISCV_RELEASE" >> $GITHUB_ENV
+
+      - name: Restore cached toolchain and sail-riscv
+        id: restore-cached-toolchain-sail-riscv
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ${{ github.workspace }}/riscv
+            ${{ github.workspace }}/sail-riscv
+          key: ${{ runner.os }}-toolchain-${{ env.TOOLCHAIN_RELEASE }}-sail-riscv-${{ env.SAIL_RISCV_RELEASE }}
+
+      - name: Install toolchain
+        if: steps.restore-cached-toolchain-sail-riscv.outputs.cache-hit != 'true'
+        run: |
+          just install-toolchain ${{ github.workspace }}
+
+      - name: Install Sail RISC-V
+        if: steps.restore-cached-toolchain-sail-riscv.outputs.cache-hit != 'true'
+        run: |
+          just install-sail-riscv ${{ github.workspace }}
+
+      - name: Cache toolchain and sail-riscv
+        id: cache-toolchain-sail-riscv
+        # Update cache only on the main branch
+        if: steps.restore-cached-toolchain-sail-riscv.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ${{ github.workspace }}/riscv
+            ${{ github.workspace }}/sail-riscv
+          key: ${{ steps.restore-cached-toolchain-sail-riscv.outputs.cache-primary-key }}
+
+      - name: Setup environment
+        run: |
+          echo "PATH=${{ github.workspace }}/riscv/bin:${{ github.workspace }}/sail-riscv/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Build arch-tests
+        run: |
+          just arch-tests-tgz ${{ github.workspace }}
+
+      - name: Upload arch-tests tar.gz
+        uses: actions/upload-artifact@v6
+        with:
+          name: riscv-arch-tests.tar.gz
+          path: riscv-arch-tests.tar.gz
+          if-no-files-found: error
+
+      - name: Finish arch-tests
+        run: |
+          echo "riscv-arch-tests tar.gz built successfully!"

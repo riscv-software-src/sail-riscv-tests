@@ -1,8 +1,9 @@
-# Sail RISC-V Tests
+# Test suites for the Sail RISC-V formal model
 ## About
- This repository provides precompiled test suites as releases for comprehensive testing of the Sail RISC-V model. The tests are built from the following source repositories.
+ This repository provides precompiled test suites as releases for comprehensive testing of the [Sail RISC-V model](https://github.com/riscv/sail-riscv). The tests are built from the following source repositories:
  - [riscv-tests](https://github.com/riscv-software-src/riscv-tests)
  - [riscv-vector-tests](https://github.com/chipsalliance/riscv-vector-tests)
+ - [riscv-arch-test](https://github.com/riscv/riscv-arch-test)
 
 ## Project Licensing
 

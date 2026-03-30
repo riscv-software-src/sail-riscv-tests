@@ -43,8 +43,10 @@ jobs:
             ${{ env.REPO_NAME }}: ${{ env.REPO_HASH}}
             riscv-tests: ${{ needs.build.outputs.riscv_tests_hash }}
             riscv-vector-tests: ${{ needs.build.outputs.riscv_vector_tests_hash }}
+            riscv-arch-test: ${{ needs.build.outputs.riscv_arch_tests_hash }}
             Spike: ${{ needs.build.outputs.spike_hash }}
             Toolchain release: ${{ needs.build.outputs.toolchain_release }}
+            Sail RISC-V release: ${{ needs.build.outputs.sail_riscv_release }}
           draft: true
           files: artifacts/*
           fail_on_unmatched_files: true
