@@ -9,26 +9,33 @@ def files_in_tgz(f):
             yield f
 
 def test_set_in_tgz(f):
-    return set(files_in_tgz(f))
+    return set(files_in_tgz(f)) if os.path.isfile(f) else None
 
-def show_testset_difference(opts, set, previous, current):
-    size = len(current)
-    removed, added = (previous - current, current - previous)
-    print(f"{set} has {size} test files, with {len(added)} added to and {len(removed)} removed from the previous release.")
-    if opts.verbose:
-        for t in removed: print(f"  removed {t}")
-        for t in added: print(f"  added {t}")
+def show_testset_difference(opts, test_set, previous, current):
+    match test_set_in_tgz(previous), test_set_in_tgz(current):
+        case None, None:
+            print(f"{test_set} is not present in both releases.")
+        case previous, None:
+            print(f"{test_set} with {len(previous)} tests was removed.")
+        case None, current:
+            print(f"{test_set} with {len(current)} tests was added.")
+        case previous, current:
+            removed, added = (previous - current, current - previous)
+            print(f"{test_set} has {len(current)} test files, with {len(added)} added to and {len(removed)} removed from the previous release.")
+            if opts.verbose:
+                for t in removed: print(f"  removed {t}")
+                for t in added: print(f"  added {t}")
 
 def show_release_difference(opts, testsets):
     for set, previous, current in testsets:
         show_testset_difference(opts, set, previous, current)
 
 def get_testsets(prev_release_dir, cur_release_dir):
-    testset_names = ["riscv-tests"] + [f"riscv-vector-tests-v{vlen}x{xlen}" for vlen in [128, 256, 512] for xlen in [32, 64]]
+    testset_names = ["riscv-tests", "riscv-arch-tests"] + [f"riscv-vector-tests-v{vlen}x{xlen}" for vlen in [128, 256, 512] for xlen in [32, 64]]
     testset_filenames = [name + ".tar.gz" for name in testset_names]
     return [(name,
-             test_set_in_tgz(os.path.join(prev_release_dir, filename)),
-             test_set_in_tgz(os.path.join(cur_release_dir, filename)))
+             os.path.join(prev_release_dir, filename),
+             os.path.join(cur_release_dir, filename))
             for (name, filename) in zip(testset_names, testset_filenames)]
 
 def make_cli_parser():

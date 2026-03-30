@@ -34,3 +34,12 @@ ${JUST} vector-tests-tgz 256 64
 ${JUST} vector-tests-tgz 512 32
 ${JUST} vector-tests-tgz 512 64
 #${JUST} clean-vector-tests
+
+# Sail RISC-V
+${JUST} install-sail-riscv ${INSTALL_PREFIX}
+# Make it available on PATH.
+export PATH=${INSTALL_PREFIX}/sail-riscv/bin:${PATH}
+
+# riscv-arch-tests
+${JUST} arch-tests-tgz ${INSTALL_PREFIX}
+#${JUST} clean-arch-tests

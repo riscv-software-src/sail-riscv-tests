@@ -4,3 +4,6 @@
 [submodule "riscv-vector-tests"]
 	path = riscv-vector-tests
 	url = https://github.com/chipsalliance/riscv-vector-tests
+[submodule "riscv-arch-test"]
+	path = riscv-arch-test
+	url = https://github.com/riscv-non-isa/riscv-arch-test
