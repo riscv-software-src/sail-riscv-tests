@@ -16,9 +16,9 @@ def show_testset_difference(opts, test_set, previous, current):
         case None, None:
             print(f"{test_set} is not present in both releases.")
         case previous, None:
-            print(f"{test_set} with {len(previous)} tests was removed.")
+            print(f"{test_set} with {len(previous)} test files was removed.")
         case None, current:
-            print(f"{test_set} with {len(current)} tests was added.")
+            print(f"{test_set} with {len(current)} test files was added.")
         case previous, current:
             removed, added = (previous - current, current - previous)
             print(f"{test_set} has {len(current)} test files, with {len(added)} added to and {len(removed)} removed from the previous release.")
