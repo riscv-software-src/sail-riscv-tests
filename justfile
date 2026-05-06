@@ -6,7 +6,7 @@ OS := shell('uname')
 # NOTE: Not every release of this toolchain comes with the vector extension enabled.
 # This must be manually verified for each release.
 TOOLCHAIN_RELEASE_DATE := "2026.03.13"
-SPIKE_COMMIT_HASH := "f51df5d3955a27602a872eaf01492177513baf6f"
+SPIKE_COMMIT_HASH := "20feb9c2bf2a7deab964d8190b0cbd4b4131bec3"
 SAIL_RISCV_RELEASE := "0.10"
 
 TOOLCHAIN_URL := "https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/" + TOOLCHAIN_RELEASE_DATE + "/riscv64-elf-ubuntu-22.04-gcc.tar.xz"
