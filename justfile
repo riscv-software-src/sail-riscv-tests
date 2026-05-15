@@ -75,6 +75,7 @@ prepare-spike:
       git clone https://github.com/riscv-software-src/riscv-isa-sim.git
       mkdir riscv-isa-sim/build
     fi
+    git -C riscv-isa-sim fetch -p
     git -C riscv-isa-sim reset --hard {{SPIKE_COMMIT_HASH}}
 
 [working-directory: 'riscv-isa-sim/build']
@@ -92,6 +93,9 @@ clean-spike:
 [working-directory: 'riscv-vector-tests']
 prepare-vector-tests prefix=INSTALL_PREFIX:
     git submodule update --init --recursive
+    # Makefrag gets removed during the build and regenerated; if the build is interrupted
+    # this file may not yet be regenerated, breaking the build.
+    git checkout Makefrag
 
 # The two stage make below is due to a bug in the upstream Makefile; this is the approach they use in their CI.
 [doc]
@@ -104,9 +108,27 @@ build-vector-tests VLEN XLEN prefix=INSTALL_PREFIX: (prepare-vector-tests prefix
 vector-tests-tgz VLEN XLEN prefix=INSTALL_PREFIX: (build-vector-tests VLEN XLEN prefix)
     tar -czf ../{{VECTOR_TESTS_ARCHIVE_PREFIX}}v{{VLEN}}x{{XLEN}}.tar.gz --transform='s,^./,rv{{XLEN}},' --verbose --show-transformed-names -C out/v{{VLEN}}x{{XLEN}}machine/bin/stage2 .
 
+[script("/usr/bin/bash")]
+all-vector-tests-tgz prefix=INSTALL_PREFIX:
+    set -eux
+    for vlen in 128 256 512; do
+      for xlen in 32 64; do
+        just --unstable vector-tests-tgz ${vlen} ${xlen}
+      done
+    done
+
+# Without a specified VLEN and XLEN, the clean target only cleans the build
+# for the default VLEN/XLEN.  This makes sure all the combinations used
+# in this build are cleaned.
+[doc]
 [working-directory: 'riscv-vector-tests']
+[script("/usr/bin/bash")]
 clean-vector-tests:
-    make clean
+    for vlen in 128 256 512; do
+      for xlen in 32 64; do
+        make VLEN=${vlen} XLEN=${xlen} clean
+      done
+    done
 
 ### ACT4 riscv-arch-tests recipes
 
