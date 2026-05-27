@@ -7,7 +7,7 @@ OS := shell('uname')
 # This must be manually verified for each release.
 TOOLCHAIN_RELEASE_DATE := "2026.03.13"
 SPIKE_COMMIT_HASH := "20feb9c2bf2a7deab964d8190b0cbd4b4131bec3"
-SAIL_RISCV_RELEASE := "0.10"
+SAIL_RISCV_RELEASE := "0.11"
 
 TOOLCHAIN_URL := "https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/" + TOOLCHAIN_RELEASE_DATE + "/riscv64-elf-ubuntu-22.04-gcc.tar.xz"
 SAIL_RISCV_DOWNLOAD_URL := "https://github.com/riscv/sail-riscv/releases/download/" + SAIL_RISCV_RELEASE + "/sail-riscv-" + OS + "-" + ARCH + ".tar.gz"
