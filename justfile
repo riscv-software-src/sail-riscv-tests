@@ -111,11 +111,12 @@ vector-tests-tgz VLEN XLEN prefix=INSTALL_PREFIX: (build-vector-tests VLEN XLEN 
 [script("/usr/bin/bash")]
 all-vector-tests-tgz prefix=INSTALL_PREFIX:
     set -eux
-    for vlen in 128 256 512; do
+    for vlen in 64 128 256; do
       for xlen in 32 64; do
         just --unstable vector-tests-tgz ${vlen} ${xlen}
       done
     done
+    just --unstable vector-tests-tgz 512 64
 
 # Without a specified VLEN and XLEN, the clean target only cleans the build
 # for the default VLEN/XLEN.  This makes sure all the combinations used
@@ -124,7 +125,7 @@ all-vector-tests-tgz prefix=INSTALL_PREFIX:
 [working-directory: 'riscv-vector-tests']
 [script("/usr/bin/bash")]
 clean-vector-tests:
-    for vlen in 128 256 512; do
+    for vlen in 64 128 256 512; do
       for xlen in 32 64; do
         make VLEN=${vlen} XLEN=${xlen} clean
       done
@@ -167,13 +168,18 @@ download-release release:
     if [ ! -f releases/{{release}}/{{RISCV_TESTS_ARCHIVE}} ]; then
       wget -O releases/{{release}}/{{RISCV_TESTS_ARCHIVE}} {{RELEASE_DOWNLOAD_URL}}/{{release}}/{{RISCV_TESTS_ARCHIVE}}
     fi
-    for vlen in 128 256 512; do
+    for vlen in 64 128 256; do
       for xlen in 32 64; do
         if [ ! -f releases/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz ]; then
           wget -O releases/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz {{RELEASE_DOWNLOAD_URL}}/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz
         fi
       done
     done
+    vlen=512
+    xlen=64
+    if [ ! -f releases/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz ]; then
+      wget -O releases/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz {{RELEASE_DOWNLOAD_URL}}/{{release}}/{{VECTOR_TESTS_ARCHIVE_PREFIX}}v${vlen}x${xlen}.tar.gz
+    fi
 
 # This provides only a summary. For detailed differences, run `compare-releases.py` directly with `-v`.
 [doc]
