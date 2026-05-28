@@ -113,9 +113,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        VLEN: [128, 256, 512]
+        VLEN: [64, 128, 256]
         # For now, ELEN can't be freely choosen and needs to match XLEN
         XLEN: [32, 64]
+        # Omit the 512/32 combination because it takes around 6 hours to build
+        # often exceeding the Github CI limit of 6 hours.
+        include:
+          - VLEN: 512
+            XLEN: 64
 
     steps:
       - name: Free Disk Space
