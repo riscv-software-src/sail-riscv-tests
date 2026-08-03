@@ -7,3 +7,6 @@
 [submodule "riscv-arch-test"]
 	path = riscv-arch-test
 	url = https://github.com/riscv/riscv-arch-test
+[submodule "damo-rv-priv-ats"]
+	path = damo-rv-priv-ats
+	url = https://github.com/XUANTIE-RV/damo-rv-priv-ats.git

@@ -15,6 +15,9 @@ on:
       riscv_arch_tests_hash:
         description: "riscv-arch-tests commit hash"
         value: ${{ jobs.build-riscv-tests.outputs.riscv_arch_tests_hash }}
+      damo_hash:
+        description: "damo-rv-priv-ats commit hash"
+        value: ${{ jobs.build-damo-tests.outputs.damo_hash }}
       toolchain_release:
         description: "RISC-V Toolchain Release"
         value: ${{ jobs.build-riscv-tests.outputs.toolchain_release }}
@@ -272,3 +275,61 @@ jobs:
       - name: Finish arch-tests
         run: |
           echo "riscv-arch-tests tar.gz built successfully!"
+
+  build-damo-tests:
+    name: "Build damo-rv-priv-ats tests"
+    runs-on: ubuntu-latest
+    outputs:
+      damo_hash: ${{ steps.log-versions.outputs.damo_hash }}
+
+    steps:
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Checkout repo with submodules
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup version environment
+        run: |
+          TOOLCHAIN_RELEASE=$(just show-toolchain-release)
+          echo "TOOLCHAIN_RELEASE=$TOOLCHAIN_RELEASE" >> $GITHUB_ENV
+
+      - name: Restore cached toolchain
+        id: restore-cached-toolchain
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ github.workspace }}/riscv
+          key: ${{ runner.os }}-toolchain-${{ env.TOOLCHAIN_RELEASE }}
+
+      - name: Install toolchain
+        if: steps.restore-cached-toolchain.outputs.cache-hit != 'true'
+        run: |
+          just install-toolchain ${{ github.workspace }}
+
+      - name: Setup environment
+        run: |
+          echo "PATH=${{ github.workspace }}/riscv/bin:$PATH" >> $GITHUB_ENV
+          echo "RISCV=${{ github.workspace }}/riscv" >> $GITHUB_ENV
+
+      - name: Build damo tests
+        run: |
+          just damo-tests-tgz
+
+      - name: Log versions
+        id: log-versions
+        run: |
+          DAMO_HASH=$(git -C damo-rv-priv-ats rev-parse HEAD)
+          echo "damo_hash=$DAMO_HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload damo-tests tar.gz
+        uses: actions/upload-artifact@v6
+        with:
+          name: damo-tests.tar.gz
+          path: damo-tests.tar.gz
+          if-no-files-found: error
+
+      - name: Finish damo tests
+        run: |
+          echo "damo-tests tar.gz built successfully!"

@@ -4,6 +4,7 @@
  - [riscv-tests](https://github.com/riscv-software-src/riscv-tests)
  - [riscv-vector-tests](https://github.com/chipsalliance/riscv-vector-tests)
  - [riscv-arch-test](https://github.com/riscv/riscv-arch-test)
+ - [damo-rv-priv-ats](https://github.com/XUANTIE-RV/damo-rv-priv-ats)
 
 Note that `riscv-arch-test` requires an installation of `mise`.  Please see its [installation instructions](https://mise.jdx.dev/getting-started.html).  Make sure it is activated before building the test suites.
 

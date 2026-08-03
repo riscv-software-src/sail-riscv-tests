@@ -32,7 +32,7 @@ def show_release_difference(opts, testsets):
 
 def get_testsets(prev_release_dir, cur_release_dir):
     combos = [(vlen, xlen) for vlen in [64, 128, 256, 512] for xlen in [32, 64]]
-    testset_names = ["riscv-tests", "riscv-arch-tests"] + [f"riscv-vector-tests-v{vlen}x{xlen}" for (vlen, xlen) in combos]
+    testset_names = ["riscv-tests", "riscv-arch-tests", "damo-tests"] + [f"riscv-vector-tests-v{vlen}x{xlen}" for (vlen, xlen) in combos]
     testset_filenames = [name + ".tar.gz" for name in testset_names]
     return [(name,
              os.path.join(prev_release_dir, filename),
