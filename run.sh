@@ -43,3 +43,7 @@ export PATH=${INSTALL_PREFIX}/sail-riscv/bin:${PATH}
 # riscv-arch-tests
 ${JUST} arch-tests-tgz ${INSTALL_PREFIX}
 #${JUST} clean-arch-tests
+
+# damo-rv-priv-ats hypervisor tests
+${JUST} damo-tests-tgz
+#${JUST} clean-damo-tests
