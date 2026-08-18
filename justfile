@@ -5,7 +5,7 @@ OS := shell('uname')
 
 # NOTE: Not every release of this toolchain comes with the vector extension enabled.
 # This must be manually verified for each release.
-TOOLCHAIN_RELEASE_DATE := "2026.03.13"
+TOOLCHAIN_RELEASE_DATE := "2026.07.15"
 SPIKE_COMMIT_HASH := "20feb9c2bf2a7deab964d8190b0cbd4b4131bec3"
 SAIL_RISCV_RELEASE := "0.13.1"
 
