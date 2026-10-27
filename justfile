@@ -5,9 +5,9 @@ OS := shell('uname')
 
 # NOTE: Not every release of this toolchain comes with the vector extension enabled.
 # This must be manually verified for each release.
-TOOLCHAIN_RELEASE_DATE := "2026.07.15"
+TOOLCHAIN_RELEASE_DATE := "2026.10.26"
 SPIKE_COMMIT_HASH := "20feb9c2bf2a7deab964d8190b0cbd4b4131bec3"
-SAIL_RISCV_RELEASE := "0.13.1"
+SAIL_RISCV_RELEASE := "0.16"
 
 TOOLCHAIN_URL := "https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/" + TOOLCHAIN_RELEASE_DATE + "/riscv64-elf-ubuntu-22.04-gcc.tar.xz"
 SAIL_RISCV_DOWNLOAD_URL := "https://github.com/riscv/sail-riscv/releases/download/" + SAIL_RISCV_RELEASE + "/sail-riscv-" + OS + "-" + ARCH + ".tar.gz"
@@ -164,7 +164,7 @@ prepare-arch-tests prefix=INSTALL_PREFIX:
 
 [working-directory: 'riscv-arch-test']
 build-arch-tests prefix=INSTALL_PREFIX: (prepare-arch-tests prefix)
-    CONFIG_FILES="config/sail/sail-rv64-max/test_config.yaml config/sail/sail-rv32-max/test_config.yaml" FAST=True make elfs --jobs $(nproc)
+    CONFIG_FILES="config/sail/sail-rv64-max/test_config.yaml config/sail/sail-rv32-max/test_config.yaml" FAST=True make elfs
 
 [working-directory: 'riscv-arch-test']
 arch-tests-tgz prefix=INSTALL_PREFIX: (build-arch-tests prefix)
